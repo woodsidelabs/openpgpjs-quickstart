@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<title>PGPjs Quickstart</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="js/openpgp.min.js"></script>
+<script>
+var passphrase = 'super long and hard to guess secret';
+function qs_keygen() {
+  document.getElementById('keygen_status').textContent = "<b>Coffee break! This can take several minutes.</b>";
+  console.log("keygen");
+  (async () => {
+    const { privateKeyArmored, publicKeyArmored, revocationCertificate } = await openpgp.generateKey({
+        userIds: [{ name: 'Jon Smith', email: 'jon@example.com' }] // you can pass multiple user IDs
+        ,rsaBits: 4096
+        ,passphrase: 'super long and hard to guess secret'           // protects the private key
+    });
+
+    console.log(privateKeyArmored);     // '-----BEGIN PGP PRIVATE KEY BLOCK ... '
+    document.getElementById('my-private-key').value = privateKeyArmored;
+    console.log(publicKeyArmored);      // '-----BEGIN PGP PUBLIC KEY BLOCK ... '
+    document.getElementById('my-public-key').value = publicKeyArmored;
+    console.log(revocationCertificate); // '-----BEGIN PGP PUBLIC KEY BLOCK ... '
+    document.getElementById('keygen_status').textContent = "Keys ready!";
+  })();
+}
+function qs_load_key() {
+  var keyname = document.getElementById('load_key').value;
+  console.log("Load "+keyname);
+  // var lastname = localStorage.getItem("key");
+  document.getElementById('my-private-key').value = localStorage.getItem("pgp_"+keyname);
+  document.getElementById('my-public-key').value = localStorage.getItem("pgp_pub_"+keyname);
+}
+function qs_save_key() {
+  var keyname = document.getElementById('save_key').value;
+  console.log("Save "+keyname);
+  localStorage.setItem("pgp_pub_"+keyname, document.getElementById('my-public-key').value);
+  localStorage.setItem("pgp_"+keyname, document.getElementById('my-private-key').value);
+}
+function qs_encrypt() {
+  console.log("encrypt");
+//encrypt from openpgpjs GitHub example
+//const openpgp = require('openpgp'); // use as CommonJS, AMD, ES6 module or via window.openpgp
+
+(async () => {
+    await openpgp.initWorker({ path: 'js/openpgp.worker.min.js' }); // set the relative web worker path
+
+    // put keys in backtick (``) to avoid errors caused by spaces or tabs
+    const publicKeyArmored = document.getElementById('your-public-key').value;
+    const privateKeyArmored = document.getElementById('my-private-key').value; // encrypted private key
+    const passphrase = `super long and hard to guess secret`; // what the private key is encrypted with
+
+    const { keys: [privateKey] } = await openpgp.key.readArmored(privateKeyArmored);
+    await privateKey.decrypt(passphrase);
+
+    const { data: encrypted } = await openpgp.encrypt({
+        message: openpgp.message.fromText(document.getElementById('my-message').value), // input as Message object
+        publicKeys: (await openpgp.key.readArmored(publicKeyArmored)).keys, // for encryption
+        privateKeys: [privateKey]                                           // for signing (optional)
+    });
+    console.log(encrypted); // '-----BEGIN PGP MESSAGE ... END PGP MESSAGE-----'
+    document.getElementById('send-message').value = encrypted;
+})();
+}
+function qs_decrypt() {
+  console.log("decrypt");
+//decrypt from openpgpjs GitHub example
+//const openpgp = require('openpgp'); // use as CommonJS, AMD, ES6 module or via window.openpgp
+
+(async () => {
+    await openpgp.initWorker({ path: 'js/openpgp.worker.min.js' }); // set the relative web worker path
+
+    // put keys in backtick (``) to avoid errors caused by spaces or tabs
+    const publicKeyArmored = document.getElementById('your-public-key').value;
+    const privateKeyArmored = document.getElementById('my-private-key').value; // encrypted private key
+    const passphrase = `super long and hard to guess secret`; // what the private key is encrypted with
+
+    const { keys: [privateKey] } = await openpgp.key.readArmored(privateKeyArmored);
+    await privateKey.decrypt(passphrase);
+
+    var encrypted = document.getElementById('your-message').value;
+    const { data: decrypted } = await openpgp.decrypt({
+        message: await openpgp.message.readArmored(encrypted),              // parse armored message
+        publicKeys: (await openpgp.key.readArmored(publicKeyArmored)).keys, // for verification (optional)
+        privateKeys: [privateKey]                                           // for decryption
+    });
+    console.log(decrypted); // 'Hello, World!'
+    document.getElementById('received-message').value = decrypted;
+})();
+}
+function qs_verify() {
+  console.log("verify");
+}
+</script>
+<link rel="stylesheet" href="quickstart.css">
+<body>
+
+<div class="w3-container">
+  <h2>OpenPGP.js Quickstart</h2>
+  <p>This single-page web application provides OpenPGP.js functionality compatible with PGP encryption. Click on the links below.</p>
+</div>
+
+<div class="w3-bar w3-black">
+  <button class="w3-bar-item w3-button" onclick="openCity('London')">Keys</button>
+  <button class="w3-bar-item w3-button" onclick="openCity('Paris')">Encrypt</button>
+  <button class="w3-bar-item w3-button" onclick="openCity('Tokyo')">Decrypt</button>
+  <button class="w3-bar-item w3-button" onclick="openCity('Seoul')">Verify</button>
+</div>
+
+<div id="London" class="w3-container city">
+  <h2>Keys</h2>
+  <p>Copy or paste keys below, or use the following options to create, load, save keys.</p>
+  <p><a href="#" onclick="javascript:qs_keygen();">Create new key pair</a> <span id="keygen_status" name="keygen_status">(Coffee break! Key generation can take several minutes)</span></p>
+  <p>Load from local storage: <input name="load_key" id="load_key" /> <a href="#" onclick="javascript:qs_load_key();">Load</a></p>
+  <p>Save to local storage <input name="save_key" id="save_key" /> <a href="#" onclick="javascript:qs_save_key();">Save</a></p>
+  <p>Settings: 4096-bit RSA, passphrase:<input name="key_pass" id="key_pass" /></p>
+  <p>Private Key (NEVER SHARE)<br /><textarea id="my-private-key" name="my-private-key"></textarea></p>
+  <p>Public Key<br /><textarea id="my-public-key" name="my-public-key"></textarea></p>
+</div>
+
+<div id="Paris" class="w3-container city" style="display:none">
+  <h2>Encrypt</h2>
+  <p>Please set receiver public key below. Message will be signed with your private key set in Keys tab.</p>
+  <p>Message to encrypt<br /><textarea id="my-message" name="my-message"></textarea></p>
+  <p>Recipient public key<br /><textarea id="your-public-key" name="your-public-key"></textarea></p>
+  <p><a href="#" onclick="javascript:qs_encrypt();">Encrypt</a></p>
+  <p>Signed and Encrypted Message<br /><textarea id="send-message" name="send-message"></textarea></p>
+</div>
+
+<div id="Tokyo" class="w3-container city" style="display:none">
+  <h2>Decrypt</h2>
+  <p>Paste message below.  Optionally, set sender public key below to verify signature.</p>
+  <p>Message to decrypt<br /><textarea id="your-message" name="your-message"></textarea></p>
+  <p>Sender public key (optional)<br /><textarea id="your-signing-key" name="your-signing-key"></textarea></p>
+  <p><a href="#" onclick="javascript:qs_decrypt();">Decrypt</a></p>
+  <p>Message<br /><textarea id="received-message" name="received-message"></textarea></p>
+</div>
+
+<div id="Seoul" class="w3-container city" style="display:none">
+  <h2>Verify</h2>
+  <p>Paste signed message below.  Please set sender public key below to verify signature.</p>
+  <p>Signed message<br /><textarea id="signed-message" name="signed-message"></textarea></p>
+  <p>Sender public key<br /><textarea id="your-verify-key" name="your-verify-key"></textarea></p>
+  <p><a href="#" onclick="">Verify</a></p>
+  <p>Valid?<br /><textarea id="check-sig" name="check-sig"></textarea></p>
+  <p></p>
+</div>
+
+<script>
+function openCity(cityName) {
+  var i;
+  var x = document.getElementsByClassName("city");
+  for (i = 0; i < x.length; i++) {
+    x[i].style.display = "none";  
+  }
+  document.getElementById(cityName).style.display = "block";  
+}
+</script>
+
+</body>
+</html>
+
